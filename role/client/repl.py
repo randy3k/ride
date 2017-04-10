@@ -1,4 +1,3 @@
-import time
 import os
 
 from prompt_toolkit.shortcuts import \
@@ -13,10 +12,10 @@ from prompt_toolkit.layout.lexers import PygmentsLexer
 from pygments.lexers.r import SLexer
 from pygments.styles import get_style_by_name
 
-from . import api
-from . import interface
+# from . import api
+# from . import interface
 from .keybindings import create_key_registry
-from .completion import RCompleter
+# from .completion import RCompleter
 
 
 class MultiPrompt(object):
@@ -41,19 +40,19 @@ class MultiPrompt(object):
         self._prompt_mode = m
 
 
-def create_r_eventloop():
-    def process_events(context):
-        while True:
-            if context.input_is_ready():
-                break
-            api.process_events()
-            time.sleep(0.01)
-    eventloop = create_eventloop(inputhook=process_events)
+# def create_r_eventloop():
+#     def process_events(context):
+#         while True:
+#             if context.input_is_ready():
+#                 break
+#             api.process_events()
+#             time.sleep(0.01)
+#     eventloop = create_eventloop(inputhook=process_events)
 
-    # these are necessary to run the completions in main thread.
-    eventloop.run_in_executor = lambda callback: callback()
+#     # these are necessary to run the completions in main thread.
+#     eventloop.run_in_executor = lambda callback: callback()
 
-    return eventloop
+#     return eventloop
 
 
 class RCommandlineInterface(CommandLineInterface):
@@ -78,7 +77,7 @@ def create_style():
     return style_from_dict(style_dict)
 
 
-def create_r_repl():
+def create_r_repl(request_sender):
     multi_prompt = MultiPrompt()
 
     registry = create_key_registry(multi_prompt)
@@ -93,22 +92,34 @@ def create_r_repl():
 
     history = FileHistory(os.path.join(os.path.expanduser("~"), ".role_history"))
 
+    def accept_action(cli, buf):
+        if multi_prompt.mode == "r":
+            def _handler():
+                code = buf.text.strip("\n").rstrip()
+                request_sender(code)
+                cli.current_buffer.cursor_position = len(code)
+                cli.current_buffer.text = code
+                cli.current_buffer.reset(append_to_history=True)
+                cli.output.write("\n")
+
+            cli.run_in_terminal(_handler, render_cli_done=True)
+
     application = create_prompt_application(
         get_prompt_tokens=get_prompt_tokens,
         key_bindings_registry=registry,
         lexer=PygmentsLexer(SLexer),
         style=create_style(),
-        multiline=True,
+        # multiline=True,
         history=history,
-        completer=RCompleter(multi_prompt),
+        # completer=RCompleter(multi_prompt),
         complete_while_typing=True,
-        accept_action=AcceptAction.IGNORE,
+        accept_action=AcceptAction(accept_action),
         on_exit=AbortAction.RETURN_NONE)
 
-    application.on_start = lambda cli: cli.output.write(interface.r_version() + "\n")
+    # application.on_start = lambda cli: cli.output.write(interface.r_version() + "\n")
 
-    eventloop = create_r_eventloop()
+    eventloop = create_eventloop()
 
     return RCommandlineInterface(
-            application=application,
-            eventloop=eventloop)
+        application=application,
+        eventloop=eventloop)

@@ -1,1 +1,1 @@
-from .entry_points import main
+from .application import run_server, main

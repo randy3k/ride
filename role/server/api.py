@@ -3,7 +3,7 @@ import sys
 
 from .util import ccall, cglobal
 
-# to be set by RoleApplication
+# to be set later
 rinstance = None
 
 """
