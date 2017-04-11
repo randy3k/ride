@@ -21,7 +21,7 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'role = role:application.main'
+            'role = role:application.run'
         ]
     }
 )

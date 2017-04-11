@@ -65,3 +65,11 @@ class Rinstance(object):
                 self.read_console)
             ptr = c_void_p.in_dll(self.libR, 'ptr_R_ReadConsole')
             ptr.value = cast(self.ptr_read_console, c_void_p).value
+
+        if self.write_console_ex:
+            c_void_p.in_dll(self.libR, 'ptr_R_WriteConsole').value = 0
+            # make sure it is not gc'ed
+            self.ptr_write_console_ex = CFUNCTYPE(None, c_char_p, c_int, c_int)(
+                self.write_console_ex)
+            ptr = c_void_p.in_dll(self.libR, 'ptr_R_WriteConsoleEx')
+            ptr.value = cast(self.ptr_write_console_ex, c_void_p).value

@@ -16,3 +16,13 @@ def create_read_console(request_getter):
         return 1
 
     return _read_console
+
+
+def create_write_console_ex(request_sender):
+    def _write_console_ex(buf, buflen, otype):
+
+        output = buf.decode("utf-8")
+        # todo: send otype
+        request_sender(output)
+
+    return _write_console_ex
