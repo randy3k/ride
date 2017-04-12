@@ -96,10 +96,11 @@ def create_r_repl(request_sender):
         if multi_prompt.mode == "r":
             def _handler():
                 code = buf.text.strip("\n").rstrip()
-                request_sender(code)
-                cli.current_buffer.cursor_position = len(code)
-                cli.current_buffer.text = code
-                cli.current_buffer.reset(append_to_history=True)
+                if code:
+                    request_sender(code)
+                    cli.current_buffer.cursor_position = len(code)
+                    cli.current_buffer.text = code
+                    cli.current_buffer.reset(append_to_history=True)
                 cli.output.write("\n")
 
             cli.run_in_terminal(_handler, render_cli_done=True)

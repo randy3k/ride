@@ -13,7 +13,7 @@ def run():
     while True:
         if port.value != 0:
             break
-        time.sleep(0.2)
+        time.sleep(0.05)
 
     client.run(port=port.value)
-    p.join()
+    p.terminate()

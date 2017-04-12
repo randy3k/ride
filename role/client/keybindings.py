@@ -1,7 +1,7 @@
 from __future__ import unicode_literals
 import re
 
-from prompt_toolkit.key_binding.defaults import load_key_bindings_for_prompt
+from prompt_toolkit.key_binding.defaults import load_key_bindings
 from prompt_toolkit.keys import Keys
 from prompt_toolkit.filters import Condition, HasFocus
 from prompt_toolkit.enums import DEFAULT_BUFFER, SEARCH_BUFFER
@@ -11,7 +11,10 @@ from prompt_toolkit.enums import DEFAULT_BUFFER, SEARCH_BUFFER
 
 
 def create_key_registry(multi_prompt):
-    registry = load_key_bindings_for_prompt(enable_system_bindings=True)
+    registry = load_key_bindings(
+        enable_abort_and_exit_bindings=True,
+        enable_system_bindings=True,
+        enable_search=True)
     # todo: configurable
     tabsize = 4
 
@@ -45,9 +48,9 @@ def create_key_registry(multi_prompt):
     def _(event):
         multi_prompt.mode = "help"
 
-    @registry.add_binding(Keys.ControlY, filter=is_default_buffer & in_prompt_mode("r"))
-    def _(event):
-        multi_prompt.mode = "debug"
+    # @registry.add_binding(Keys.ControlY, filter=is_default_buffer & in_prompt_mode("r"))
+    # def _(event):
+    #     multi_prompt.mode = "debug"
 
     # @registry.add_binding(Keys.BracketedPaste, filter=is_default_buffer & in_prompt_mode("r"))
     # def _(event):
@@ -94,9 +97,9 @@ def create_key_registry(multi_prompt):
 
     # debug prompt
 
-    @registry.add_binding(Keys.ControlY, filter=is_default_buffer & in_prompt_mode("debug"))
-    def _(event):
-        multi_prompt.mode = "r"
+    # @registry.add_binding(Keys.ControlY, filter=is_default_buffer & in_prompt_mode("debug"))
+    # def _(event):
+    #     multi_prompt.mode = "r"
 
     # @registry.add_binding(Keys.ControlJ, filter=is_default_buffer & in_prompt_mode("debug"))
     # def _(event):

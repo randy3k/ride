@@ -1,49 +1,34 @@
-try:
-    from queue import Queue
-except:
-    from Queue import Queue
-# from multiprocessing.connection import Client
-import socket
+from multiprocessing import Queue
+from multiprocessing.connection import Client
 import threading
 import sys
+import signal
 
 from .repl import create_r_repl
 
 
-def debug(*args):
-    with open("/tmp/debug", "a") as f:
-        f.write(*args)
-        f.write("\n")
-
-
 def run(host='localhost', port=0):
-    conn = socket.create_connection((host, port))
+    conn = Client((host, port))
 
-    ack = threading.Condition()
     receiveq = Queue()
     sendq = Queue()
 
     def get_requests_in_thread():
         while True:
-            # todo: handle more than 4096 bytes
-            request = conn.recv(4096)
-            # debug(request.decode("utf-8"))
-
-            if request == b"<server_ack>":
-                with ack:
-                    ack.notify()
-            else:
-                # acknowledge
-                conn.send(b"<client_ack>")
+            try:
+                request = conn.recv()
                 receiveq.put(request.decode("utf-8"))
+            except (OSError, EOFError):
+                break
 
     threading.Thread(target=get_requests_in_thread).start()
 
     def send_requests_in_thread():
         while True:
-            with ack:
+            try:
                 conn.send(sendq.get().encode("utf-8"))
-                ack.wait()
+            except EOFError:
+                break
 
     threading.Thread(target=send_requests_in_thread).start()
 
@@ -51,7 +36,10 @@ def run(host='localhost', port=0):
 
     def processing_requests():
         while True:
-            request = receiveq.get()
+            try:
+                request = receiveq.get()
+            except EOFError:
+                break
             if request == "<ready>":
                 with ready:
                     ready.notify()
@@ -65,6 +53,10 @@ def run(host='localhost', port=0):
         with ready:
             ready.wait()
 
-    cli = create_r_repl(request_sender)
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
 
+    cli = create_r_repl(request_sender)
     cli.run()
+    sendq.close()
+    receiveq.close()
+    conn.close()
