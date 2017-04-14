@@ -16,6 +16,7 @@ setup(
     long_description=long_description,
     packages=["role"],
     install_requires=[
+        'zmq>=13',
         'prompt_toolkit>=1.0.14,<2.0.0',
         'pygments',
     ],

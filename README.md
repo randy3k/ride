@@ -9,18 +9,15 @@ Note: _Role_ is very new, users should use it at their own risks.
 
 ### Features
 
-Implemented features:
+Progress
 
 - [x] multiline editing
 - [x] brackted paste mode
 - [x] syntax highlight
-- [x] auto completion
+- [ ] auto completion
 - [x] lightwight, no compilation is required
-- [x] cross-platform, work on Windows, macOS and Linux
+- [x] cross-platform, work on ~~Windows~~, macOS and Linux
 - [x] robust, run on both Python 2 and 3
-
-Planned features:
-
 - [ ] allow custom color scheme
 - [ ] highlight output
 - [ ] object viewer
@@ -52,4 +49,4 @@ $ role
 
 ### Caveat
 
-_Role_ is written in pure python and built on the [prompt-toolkit](https://github.com/jonathanslenders/python-prompt-toolkit) and _Role_ has a minimal dependency of `six`, `wcwidth`, `prompt-toolkit`, `pygments`.
+_Role_ is written in pure python and built on the [prompt-toolkit](https://github.com/jonathanslenders/python-prompt-toolkit) and _Role_ has a minimal dependency of `six`, `wcwidth`, `prompt-toolkit`, `pygments` and `pyzmq`.

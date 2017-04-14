@@ -77,7 +77,7 @@ def create_style():
     return style_from_dict(style_dict)
 
 
-def create_r_repl(request_sender):
+def create_r_repl(handle_request):
     multi_prompt = MultiPrompt()
 
     registry = create_key_registry(multi_prompt)
@@ -97,7 +97,7 @@ def create_r_repl(request_sender):
             def _handler():
                 code = buf.text.strip("\n").rstrip()
                 if code:
-                    request_sender(code)
+                    handle_request(code)
                     cli.current_buffer.cursor_position = len(code)
                     cli.current_buffer.text = code
                     cli.current_buffer.reset(append_to_history=True)

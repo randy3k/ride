@@ -1,62 +1,45 @@
-from multiprocessing import Queue
-from multiprocessing.connection import Client
-import threading
+import zmq
 import sys
 import signal
 
 from .repl import create_r_repl
 
 
-def run(host='localhost', port=0):
-    conn = Client((host, port))
-
-    receiveq = Queue()
-    sendq = Queue()
-
-    def get_requests_in_thread():
-        while True:
-            try:
-                request = conn.recv()
-                receiveq.put(request.decode("utf-8"))
-            except (OSError, EOFError):
-                break
-
-    threading.Thread(target=get_requests_in_thread).start()
-
-    def send_requests_in_thread():
-        while True:
-            try:
-                conn.send(sendq.get().encode("utf-8"))
-            except EOFError:
-                break
-
-    threading.Thread(target=send_requests_in_thread).start()
-
-    ready = threading.Condition()
-
-    def processing_requests():
-        while True:
-            try:
-                request = receiveq.get()
-            except EOFError:
-                break
-            if request == "<ready>":
-                with ready:
-                    ready.notify()
-            else:
-                sys.stdout.write(request)
-
-    threading.Thread(target=processing_requests).start()
-
-    def request_sender(request):
-        sendq.put(request)
-        with ready:
-            ready.wait()
-
+def run(ports):
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
-    cli = create_r_repl(request_sender)
+    context = zmq.Context()
+    stdin = context.socket(zmq.REP)
+    stdin.bind("tcp://*:{}".format(ports["stdin_port"]))
+
+    iopub = context.socket(zmq.SUB)
+    iopub.connect("tcp://localhost:{}".format(ports["iopub_port"]))
+    iopub.setsockopt(zmq.SUBSCRIBE, b"")
+
+    poller = zmq.Poller()
+    poller.register(stdin, zmq.POLLIN)
+    poller.register(iopub, zmq.POLLIN)
+
+    initalized = [False]
+
+    def handle_request(request):
+        if not initalized[0]:
+            initalized[0] = True
+            stdin.recv()  # ready
+
+        stdin.send(request.encode("utf-8"))
+
+        while True:
+            socks = dict(poller.poll())
+            if iopub in socks and socks[iopub] == zmq.POLLIN:
+                output = iopub.recv()
+                sys.stdout.write(output.decode("utf-8"))
+            if stdin in socks and socks[stdin] == zmq.POLLIN:
+                stdin.recv()  # wait until next ready
+                break
+        while poller.poll(1):
+            output = iopub.recv()
+            sys.stdout.write(output.decode("utf-8"))
+
+    cli = create_r_repl(handle_request)
     cli.run()
-    sendq.close()
-    receiveq.close()
-    conn.close()
