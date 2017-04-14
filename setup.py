@@ -14,9 +14,9 @@ setup(
     url='https://github.com/randy3k/role',
     description='R REPL build on top of prompt_toolkit',
     long_description=long_description,
-    packages=["role"],
+    packages=["role", "role.client", "role.server"],
     install_requires=[
-        'zmq>=13',
+        'pyzmq>=13',
         'prompt_toolkit>=1.0.14,<2.0.0',
         'pygments',
     ],

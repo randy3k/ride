@@ -3,7 +3,11 @@ import ctypes
 
 def create_read_console(get_text):
     def _read_console(p, buf, buflen, add_history):
-        code = get_text().encode("utf-8")
+        text = get_text()
+        if text is None:
+            return 0
+
+        code = text.encode("utf-8")
         addr = ctypes.addressof(buf.contents)
         c2 = (ctypes.c_char * buflen).from_address(addr)
         nb = min(len(code), buflen-2)
