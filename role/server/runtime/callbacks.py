@@ -19,11 +19,11 @@ def create_read_console(get_text):
     return _read_console
 
 
-def create_write_console_ex(send_io):
+def create_write_console_ex(_handler):
     def _write_console_ex(buf, buflen, otype):
 
         output = buf.decode("utf-8")
         # todo: send otype
-        send_io(output)
+        _handler(output)
 
     return _write_console_ex

@@ -1,14 +1,14 @@
 from multiprocessing import Process
 import optparse
-import signal
 
-from . import server
-from . import client
+from .server.util import free_ports
+from .server.server import RoleServer
+from .client.client import RoleClient
 
 
 def connection_ports(ports):
     if not ports:
-        ports = server.free_ports(5)
+        ports = free_ports(5)
     return {
         "shell_port": ports[0],
         "iopub_port": ports[1],
@@ -22,17 +22,26 @@ def run():
 
     parser = optparse.OptionParser()
     parser.add_option('--ports')
-    parser.add_option('--server-only', action="store_false", default=True, dest="run_client")
-    parser.add_option('--client-only', action="store_false", default=True, dest="run_server")
+    parser.add_option('--server', action="store_false", default=True, dest="run_client")
+    parser.add_option('--client', action="store_false", default=True, dest="run_server")
     options, remainder = parser.parse_args()
 
-    ports = connection_ports(options.ports.split(",") if options.ports else None)
-
-    # signal.signal(signal.SIGINT, signal.SIG_IGN)
+    port_dict = connection_ports(options.ports.split(",") if options.ports else None)
 
     if options.run_server:
-        server_process = Process(target=server.run, args=(ports,))
-        server_process.start()
+        role_server = RoleServer(port_dict)
+        if options.run_client:
+            server_process = Process(target=role_server.run)
+            server_process.start()
+        else:
+            print("launch client `role --client --ports={},{},{},{},{}`".format(
+                port_dict["shell_port"],
+                port_dict["iopub_port"],
+                port_dict["stdin_port"],
+                port_dict["control_port"],
+                port_dict["hb_port"]))
+            role_server.run()
 
     if options.run_client:
-        client.run(ports, options.run_server)
+        role_client = RoleClient(port_dict)
+        role_client.run()

@@ -3,69 +3,89 @@ import os
 import signal
 import threading
 
-from . import proxy
-from . import api
-from .runtime import Rinstance
-from .callbacks import create_read_console, create_write_console_ex
+from .util import free_ports
+from .proxy import run_proxy
+from .runtime import api
+from .runtime.instance import Rinstance
+from .runtime.callbacks import create_read_console, create_write_console_ex
 
 
-def free_ports(nports):
-    context = zmq.Context()
-    binder = context.socket(zmq.ROUTER)
-    ports = []
-    for i in range(nports):
-        ports.append(binder.bind_to_random_port('tcp://127.0.0.1'))
-    binder.close()
-    context.destroy()
-    return ports
+class RoleServer(object):
 
+    def __init__(self, ports):
+        self.context = zmq.Context()
+        self.ports = ports
+        super(RoleServer, self).__init__()
 
-def run(ports):
-    context = zmq.Context()
+    def connect_channels(self):
+        ports = self.ports
+        context = self.context
 
-    ports["shell_back_port"], ports["stdin_back_port"], ports["control_back_port"] = free_ports(3)
+        shell = context.socket(zmq.REP)
+        shell.connect("tcp://127.0.0.1:{}".format(ports["shell_back_port"]))
 
-    shell = context.socket(zmq.REP)
-    shell.connect("tcp://127.0.0.1:{}".format(ports["shell_back_port"]))
+        stdin = context.socket(zmq.REQ)
+        stdin.connect("tcp://127.0.0.1:{}".format(ports["stdin_back_port"]))
 
-    stdin = context.socket(zmq.REQ)
-    stdin.connect("tcp://127.0.0.1:{}".format(ports["stdin_back_port"]))
+        iopub = context.socket(zmq.PUB)
+        iopub.bind("tcp://127.0.0.1:{}".format(ports["iopub_port"]))
 
-    iopub = context.socket(zmq.PUB)
-    iopub.bind("tcp://127.0.0.1:{}".format(ports["iopub_port"]))
+        self.shell = shell
+        self.stdin = stdin
+        self.iopub = iopub
 
-    proxy.run(context, ports)
+        self.connect_control_channel()
 
-    rinstance = Rinstance()
-    api.rinstance = rinstance
+    def connect_control_channel(self):
 
-    def get_text():
-        stdin.send(b"ready")
-        reply = stdin.recv()
-        return reply.decode("utf-8")
+        def _control_thread():
+            control = self.context.socket(zmq.REP)
+            control.connect("tcp://127.0.0.1:{}".format(self.ports["control_back_port"]))
+            control_poller = zmq.Poller()
+            control_poller.register(control, zmq.POLLIN)
+            while True:
+                if control_poller.poll():
+                    request = control.recv()
+                    control.send(b"ack")
+                    if request == b"SIGTERM":
+                        os.kill(os.getpid(), signal.SIGTERM)
+                    elif request == b"SIGINT":
+                        os.kill(os.getpid(), signal.SIGINT)
 
-    rinstance.read_console = create_read_console(get_text)
+        threading.Thread(target=_control_thread).start()
 
-    def send_io(request):
-        iopub.send(request.encode("utf-8"))
+    def setup_rinstance(self):
 
-    rinstance.write_console_ex = create_write_console_ex(send_io)
+        api.rinstance = self.rinstance
 
-    def control_select():
-        control = context.socket(zmq.REP)
-        control.connect("tcp://127.0.0.1:{}".format(ports["control_back_port"]))
-        while True:
-            if zmq.select([control], [], [])[0]:
-                request = control.recv()
-                control.send(b"ack")
-                if request == b"SIGTERM":
-                    os.kill(os.getpid(), signal.SIGTERM)
-                elif request == b"SIGINT":
-                    os.kill(os.getpid(), signal.SIGINT)
+        initialized = [False]
 
-    threading.Thread(target=control_select).start()
+        def get_text():
+            if not initialized[0]:
+                initialized[0] = True
+            self.stdin.send(b"ready")
+            reply = self.stdin.recv()
+            return reply.decode("utf-8")
 
-    # rinstance.polled_events = event_callback
+        self.rinstance.read_console = create_read_console(get_text)
 
-    rinstance.run()
-    context.destroy()
+        def print_text(text):
+            self.iopub.send(text.encode("utf-8"))
+
+        self.rinstance.write_console_ex = create_write_console_ex(print_text)
+
+    def run(self):
+        ports = self.ports
+        (ports["shell_back_port"],
+         ports["stdin_back_port"],
+         ports["control_back_port"]) = free_ports(3)
+
+        run_proxy(self.context, self.ports)
+        self.connect_channels()
+
+        self.rinstance = Rinstance()
+        self.setup_rinstance()
+
+        # run the r eventloop
+        self.rinstance.run()
+        self.context.term()

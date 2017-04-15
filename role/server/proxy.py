@@ -26,7 +26,7 @@ def control_proxy_server(context, ports):
     zmq.device(zmq.QUEUE, control_frontend, control_backend)
 
 
-def run(context, ports):
+def run_proxy(context, ports):
 
     stdin_proxy = Thread(target=shell_proxy_server, args=(context, ports,))
     stdin_proxy.start()
