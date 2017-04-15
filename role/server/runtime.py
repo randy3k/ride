@@ -10,6 +10,7 @@ class Rinstance(object):
     offset = None
     write_console_ex = None
     read_console = None
+    polled_events = None
 
     def __init__(self):
         if 'R_HOME' not in os.environ:
@@ -73,3 +74,8 @@ class Rinstance(object):
                 self.write_console_ex)
             ptr = c_void_p.in_dll(self.libR, 'ptr_R_WriteConsoleEx')
             ptr.value = cast(self.ptr_write_console_ex, c_void_p).value
+
+        if self.polled_events:
+            self.ptr_polled_events = CFUNCTYPE(None)(self.polled_events)
+            ptr = c_void_p.in_dll(self.libR, 'R_PolledEvents')
+            ptr.value = cast(self.ptr_polled_events, c_void_p).value

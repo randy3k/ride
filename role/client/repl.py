@@ -66,6 +66,29 @@ class RCommandlineInterface(CommandLineInterface):
         self.renderer.request_absolute_cursor_position()
         self.current_buffer.reset(append_to_history=True)
 
+    def run_in_terminal(self, func, render_cli_done=False, raw_mode=False):
+        if render_cli_done:
+            self._return_value = True
+            self._redraw()
+            self.renderer.reset()  # Make sure to disable mouse mode, etc...
+        else:
+            self.renderer.erase()
+        self._return_value = None
+
+        # Run system command.
+        if raw_mode:
+            result = func()
+        else:
+            with self.input.cooked_mode():
+                result = func()
+
+        # Redraw interface again.
+        self.renderer.reset()
+        self.renderer.request_absolute_cursor_position()
+        self._redraw()
+
+        return result
+
 
 def create_style():
     style_dict = {}
@@ -94,16 +117,7 @@ def create_r_repl(on_accept_action):
 
     def accept_action(cli, buf):
         if multi_prompt.mode == "r":
-            def _handler():
-                code = buf.text.strip("\n").rstrip()
-                if code:
-                    on_accept_action(code)
-                    cli.current_buffer.cursor_position = len(code)
-                    cli.current_buffer.text = code
-                    cli.current_buffer.reset(append_to_history=True)
-                cli.output.write("\n")
-
-            cli.run_in_terminal(_handler, render_cli_done=True)
+            cli.run_in_terminal(lambda: on_accept_action(cli), render_cli_done=True, raw_mode=True)
 
     application = create_prompt_application(
         get_prompt_tokens=get_prompt_tokens,
