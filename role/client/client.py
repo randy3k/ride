@@ -3,9 +3,12 @@ import sys
 import os
 
 from .repl import create_r_repl
+from .heartbeat import HeartBeatChannel
 
 
 class RoleClient(object):
+
+    initialized = False
 
     def __init__(self, ports):
         self.context = zmq.Context()
@@ -41,43 +44,20 @@ class RoleClient(object):
     def run(self):
 
         self.connect_channels()
+        self.heartbeat_channel = HeartBeatChannel(self.context, self.ports["hb_port"])
+        self.heartbeat_channel.start()
         self.setup_pollers()
 
-        initialized = [False]
-
-        def accept_action(cli, buf):
-            shouldexit = [False]
-
-            def _handler():
-                if not initialized[0]:
-                    initialized[0] = True
-                    self.stdin.send(b"CLIENT_READY")  # ready
-                    self.stdin.recv()  # server is ready
-
-                text = buf.text.strip("\n").rstrip()
-                if text:
-                    buf.cursor_position = len(text)
-                    buf.text = text
-                    buf.reset(append_to_history=True)
-                cli.output.write("\n")
-
-                self.stdin.send(text.encode("utf-8"))
-                result = self.wait_until_ready(cli)
-                shouldexit[0] = not result
-                return result
-
-            cli.run_in_terminal(_handler, render_cli_done=True, raw_mode=True)
-
-            if shouldexit[0]:
-                cli.exit()
-
-        cli = create_r_repl(accept_action)
+        cli = create_r_repl(self.accept_action)
         cli.run()
+
+        # todo: move to cli.on_exit
         self.control.send(b"SIGQUIT")
         self.shell.close()
         self.stdin.close()
         self.iopub.close()
         self.control.close()
+        self.heartbeat_channel.close()
         self.context.term()
 
     def setup_pollers(self):
@@ -87,10 +67,29 @@ class RoleClient(object):
         self.busy_poller.register(self.iopub, zmq.POLLIN)
         self.busy_poller.register(self.control, zmq.POLLIN)
 
-    def wait_until_ready(self, cli):
+    def accept_action(self, cli, buf):
+        if not self.initialized:
+            self.initialized = True
+            self.stdin.send(b"CLIENT_READY")  # ready
+            self.stdin.recv()  # server is ready
+
+        text = buf.text.strip("\n").rstrip()
+        if text:
+            buf.cursor_position = len(text)
+            buf.text = text
+            buf.reset(append_to_history=True)
+
+        self.stdin.send(text.encode("utf-8"))
+        retcode = self.wait_until_ready()
+        return retcode
+
+    def wait_until_ready(self):
         sigint_is_pending = False
         while True:
-            readers = dict(self.busy_poller.poll())
+            if not self.heartbeat_channel.is_beating():
+                return 1
+
+            readers = dict(self.busy_poller.poll(100))
 
             if self.control in readers:
                 # get any ack reply from control channel
@@ -107,13 +106,10 @@ class RoleClient(object):
 
             elif self.iopub in readers:
                 output = self.iopub.recv()
-                if output == b"SERVER_DEAD":
-                    return False
-                else:
-                    sys.stdout.write(output.decode("utf-8"))
+                sys.stdout.write(output.decode("utf-8"))
 
             elif self.stdin in readers:
                 self.stdin.recv()  # server is ready
                 break
 
-        return True
+        return 0

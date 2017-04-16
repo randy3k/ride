@@ -40,16 +40,15 @@ class RoleServer(object):
         self.iopub = iopub
 
         self.connect_control_channel()
+        self.connect_heartbeat_channel()
 
     def connect_control_channel(self):
 
         def _control_thread():
             control = self.context.socket(zmq.REP)
             control.connect("tcp://127.0.0.1:{}".format(self.ports["control_back_port"]))
-            control_poller = zmq.Poller()
-            control_poller.register(control, zmq.POLLIN)
             while True:
-                if control_poller.poll():
+                if control.poll():
                     request = control.recv()
                     control.send(b"ack")
                     if request == b"SIGQUIT":
@@ -58,6 +57,18 @@ class RoleServer(object):
                         os.kill(os.getpid(), signal.SIGINT)
 
         threading.Thread(target=_control_thread).start()
+
+    def connect_heartbeat_channel(self):
+
+        def _heartbeat_thread():
+            hb = self.context.socket(zmq.REP)
+            hb.bind("tcp://127.0.0.1:{}".format(self.ports["hb_port"]))
+            while True:
+                if hb.poll():
+                    hb.recv()
+                    hb.send(b"ack")
+
+        threading.Thread(target=_heartbeat_thread).start()
 
     def setup_rinstance(self):
 
@@ -86,7 +97,8 @@ class RoleServer(object):
         self.rinstance.write_console_ex = create_write_console_ex(print_text)
 
         def clean_up():
-            self.iopub.send(b"SERVER_DEAD")
+            # todo: ask_exit
+            pass
 
         self.rinstance.clean_up = clean_up
 

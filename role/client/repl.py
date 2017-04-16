@@ -66,32 +66,6 @@ class RCommandlineInterface(CommandLineInterface):
         self.renderer.request_absolute_cursor_position()
         self.current_buffer.reset(append_to_history=True)
 
-    def run_in_terminal(self, func, render_cli_done=False, raw_mode=False):
-        if render_cli_done:
-            self._return_value = True
-            self._redraw()
-            self.renderer.reset()  # Make sure to disable mouse mode, etc...
-        else:
-            self.renderer.erase()
-        self._return_value = None
-
-        # allow running the callback in raw mode
-        if raw_mode:
-            # Run system command.
-            result = func()
-        else:
-            with self.input.cooked_mode():
-                result = func()
-
-        # Redraw interface again.
-        self.renderer.reset()
-        if result:
-            # only request cursor position if `result` is True
-            self.renderer.request_absolute_cursor_position()
-        self._redraw()
-
-        return result
-
 
 def create_style():
     style_dict = {}
@@ -118,9 +92,26 @@ def create_r_repl(accept_action):
 
     history = FileHistory(os.path.join(os.path.expanduser("~"), ".role_history"))
 
-    def _accept_action(cli, buf):
+    def accept_action_handler(cli, buf):
         if multi_prompt.mode == "r":
-            accept_action(cli, buf)
+            # it is almost like run_in_terminal at /prompt_toolkit/interface.py
+            cli._return_value = True
+            cli._redraw()
+            cli.renderer.reset()  # Make sure to disable mouse mode, etc...
+            cli._return_value = None
+
+            result = accept_action(cli, buf)
+
+            cli.output.write("\n")
+
+            if result == 0:
+                # Redraw interface again.
+                cli.renderer.reset()
+                cli.renderer.request_absolute_cursor_position()
+                cli._redraw()
+            else:
+                cli.renderer.erase()
+                cli._set_return_callable(lambda: None)
 
     application = create_prompt_application(
         get_prompt_tokens=get_prompt_tokens,
@@ -131,7 +122,7 @@ def create_r_repl(accept_action):
         history=history,
         # completer=RCompleter(multi_prompt),
         complete_while_typing=True,
-        accept_action=AcceptAction(_accept_action),
+        accept_action=AcceptAction(accept_action_handler),
         on_exit=AbortAction.RETURN_NONE)
 
     # application.on_start = lambda cli: cli.output.write(interface.r_version() + "\n")

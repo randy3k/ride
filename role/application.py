@@ -45,3 +45,5 @@ def run():
     if options.run_client:
         role_client = RoleClient(port_dict)
         role_client.run()
+        if options.run_server:
+            server_process.join()
