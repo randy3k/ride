@@ -11,9 +11,9 @@ def shell_proxy_server(context, ports):
 
 
 def stdin_proxy_server(context, ports):
-    stdin_frontend = context.socket(zmq.DEALER)
+    stdin_frontend = context.socket(zmq.ROUTER)
     stdin_frontend.bind("tcp://127.0.0.1:{}".format(ports["stdin_port"]))
-    stdin_backend = context.socket(zmq.ROUTER)
+    stdin_backend = context.socket(zmq.DEALER)
     stdin_backend.bind("tcp://127.0.0.1:{}".format(ports["stdin_back_port"]))
     zmq.device(zmq.QUEUE, stdin_frontend, stdin_backend)
 

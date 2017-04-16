@@ -75,8 +75,9 @@ class RCommandlineInterface(CommandLineInterface):
             self.renderer.erase()
         self._return_value = None
 
-        # Run system command.
+        # allow running the callback in raw mode
         if raw_mode:
+            # Run system command.
             result = func()
         else:
             with self.input.cooked_mode():
@@ -84,7 +85,9 @@ class RCommandlineInterface(CommandLineInterface):
 
         # Redraw interface again.
         self.renderer.reset()
-        self.renderer.request_absolute_cursor_position()
+        if result:
+            # only request cursor position if `result` is True
+            self.renderer.request_absolute_cursor_position()
         self._redraw()
 
         return result
@@ -100,7 +103,7 @@ def create_style():
     return style_from_dict(style_dict)
 
 
-def create_r_repl(on_accept_action):
+def create_r_repl(accept_action):
     multi_prompt = MultiPrompt()
 
     registry = create_key_registry(multi_prompt)
@@ -115,9 +118,9 @@ def create_r_repl(on_accept_action):
 
     history = FileHistory(os.path.join(os.path.expanduser("~"), ".role_history"))
 
-    def accept_action(cli, buf):
+    def _accept_action(cli, buf):
         if multi_prompt.mode == "r":
-            cli.run_in_terminal(lambda: on_accept_action(cli), render_cli_done=True, raw_mode=True)
+            accept_action(cli, buf)
 
     application = create_prompt_application(
         get_prompt_tokens=get_prompt_tokens,
@@ -128,7 +131,7 @@ def create_r_repl(on_accept_action):
         history=history,
         # completer=RCompleter(multi_prompt),
         complete_while_typing=True,
-        accept_action=AcceptAction(accept_action),
+        accept_action=AcceptAction(_accept_action),
         on_exit=AbortAction.RETURN_NONE)
 
     # application.on_start = lambda cli: cli.output.write(interface.r_version() + "\n")

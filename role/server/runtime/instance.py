@@ -11,6 +11,7 @@ class Rinstance(object):
     write_console_ex = None
     read_console = None
     polled_events = None
+    clean_up = None
 
     def __init__(self):
         if 'R_HOME' not in os.environ:
@@ -79,3 +80,15 @@ class Rinstance(object):
             self.ptr_polled_events = CFUNCTYPE(None)(self.polled_events)
             ptr = c_void_p.in_dll(self.libR, 'R_PolledEvents')
             ptr.value = cast(self.ptr_polled_events, c_void_p).value
+
+        if self.clean_up:
+            ptr = c_void_p.in_dll(self.libR, 'ptr_R_CleanUp')
+            R_CleanUp_Type = CFUNCTYPE(None, c_int, c_int, c_int)
+            old_ptr_clean_up = ptr.value
+
+            def _handler(save_type, status, runlast):
+                self.clean_up()
+                R_CleanUp_Type(old_ptr_clean_up)(save_type, status, runlast)
+
+            self.ptr_r_clean_up = R_CleanUp_Type(_handler)
+            ptr.value = cast(self.ptr_r_clean_up, c_void_p).value
