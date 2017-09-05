@@ -93,3 +93,10 @@ let g:R_cmd = "R"
 let g:R_hl_term = 0
 ```
 in your vim config.
+
+### Error `libreadline.so.6: undefined symbol: PC`
+
+If you are using conda and encounter this error, it is likely before the readline from conda is bugged. Install it again via `conda-forge`.
+```python
+conda install -c conda-forge readline=6.2
+```
