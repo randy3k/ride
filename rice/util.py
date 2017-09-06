@@ -1,5 +1,6 @@
 from __future__ import unicode_literals
 from ctypes import c_char_p, c_void_p, cast
+import os
 
 
 def ccall(fname, lib, restype, argtypes, *args):
@@ -19,3 +20,10 @@ def cglobal(vname, lib, vtype=c_void_p):
 
 def is_ascii(s):
     return all(ord(c) < 128 for c in s)
+
+
+def pretty_path(path):
+    user_home = os.path.expanduser('~') + os.sep
+    if path and path.startswith(user_home):
+        path = os.path.join("~", path[len(user_home):])
+    return path

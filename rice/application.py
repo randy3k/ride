@@ -6,6 +6,7 @@ import time
 from .instance import Rinstance
 from . import interface
 from . import api
+from . import util
 from .callbacks import create_read_console, create_write_console_ex
 from prompt_toolkit import Prompt
 from prompt_toolkit.eventloop import create_event_loop, set_event_loop
@@ -29,6 +30,7 @@ def rice_settings():
     settings = {
         "color_scheme": interface.get_option("rice.color_scheme") or "native",
         "editing_mode": interface.get_option("rice.editing_mode") or "emacs",
+        "show_statusbar": interface.get_option("rice.show_statusbar") == 1,
     }
     return settings
 
@@ -44,19 +46,29 @@ class MultiPrompt(Prompt):
 
     def __init__(self, *args, **kwargs):
         super(MultiPrompt, self).__init__(*args, **kwargs)
+        self.style = None
         self.app.prompt_mode = self._default_prompt_mode
 
-    def prompt(self, message=None, color_scheme="vim", mode="emacs", **kwargs):
+    def _bottom_toolbar(self):
+        path = interface.rcopy(interface.reval("base::getwd()"), simplify=True)
+        return util.pretty_path(path)
+
+    def prompt(self, message=None, color_scheme="vim", mode="emacs", show_statusbar=True, **kwargs):
         if not message:
             message = self._prompts[self.app.prompt_mode]
 
         editing_mode = EditingMode.VI if mode == "vi" or mode == "vim" else EditingMode.EMACS
-        style = merge_styles([
-            default_style(),
-            style_from_pygments(get_style_by_name(color_scheme))])
+        if not self.style:
+            self.style = merge_styles([
+                default_style(),
+                style_from_pygments(get_style_by_name(color_scheme))])
 
         return super(MultiPrompt, self).prompt(
-            message, editing_mode=editing_mode, style=style, **kwargs)
+            message,
+            editing_mode=editing_mode,
+            style=self.style,
+            bottom_toolbar=self._bottom_toolbar if show_statusbar else None,
+            **kwargs)
 
 
 if not is_windows():
@@ -144,7 +156,8 @@ class RiceApplication(object):
                     if p == "> ":
                         text = mp.prompt(
                             color_scheme=_settings[0].get("color_scheme"),
-                            mode=_settings[0].get("editing_mode"))
+                            mode=_settings[0].get("editing_mode"),
+                            show_statusbar=_settings[0].get("show_statusbar"))
                     else:
                         # invoked by `readline`
                         text = mp.prompt(
