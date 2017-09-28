@@ -1,5 +1,6 @@
 from __future__ import unicode_literals
-from ctypes import c_char_p, c_void_p, cast
+from ctypes import c_char_p, c_void_p, cast, CDLL
+from ctypes.util import find_library
 
 
 def ccall(fname, lib, restype, argtypes, *args):
