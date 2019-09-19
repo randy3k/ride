@@ -3,85 +3,6 @@ name: build
 on: [push]
 
 jobs:
-  linux:
-    strategy:
-      matrix:
-        r: [latest]
-        # r: [3.5, latest, devel]
-        python: [3.7]
-        # python: [2.7, 3.4, 3.5, 3.6, 3.7]
-    runs-on: ubuntu-latest
-    container: rocker/tidyverse:${{ matrix.r }}
-    steps:
-    - uses: actions/checkout@v1
-    - name: Install apt-get dependencies
-      run: |
-        apt-get update
-        apt-get install git ssh curl bzip2 libffi6 libffi-dev -y
-    - name: Install Miniconda
-      run: |
-        curl -L https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -o /tmp/miniconda.sh
-        bash /tmp/miniconda.sh -b -f -p $HOME/miniconda
-    - name: Install reticulate
-      run: R -e "install.packages('reticulate', repo = 'https://cloud.r-project.org')"
-    - name: Install and running tests
-      run: |
-        export PATH="$HOME/miniconda/bin:$PATH"
-        if [ "${{ matrix.python }}" == "3.4" ]; then
-          conda create -n myenv python=${{ matrix.python }} -c conda-forge
-        else
-          conda create -n myenv python=${{ matrix.python }}
-        fi
-        source $HOME/miniconda/bin/activate myenv
-        python -m pip install -e .[test]
-        python -m pip install jedi
-        pytest -s
-      shell:
-        bash
-
-  macos:
-    strategy:
-      matrix:
-        r: [latest]
-        # r: [3.5, latest, devel]
-        python: [3.7]
-        # python: [2.7, 3.4, 3.5, 3.6, 3.7]
-    runs-on: macOS-latest
-    steps:
-    - uses: actions/checkout@v1
-    - name: Install Miniconda
-      run: |
-        curl -L https://repo.continuum.io/miniconda/Miniconda3-latest-MacOSX-x86_64.sh -o /tmp/miniconda.sh
-        bash /tmp/miniconda.sh -b -f -p $HOME/miniconda
-    - name: Install R
-      run: |
-        if [ "${{ matrix.r }}" == "devel" ]; then
-          R_FILE=$(curl -sL http://mac.r-project.org/ | sed -nE 's|.*href="?(.*/R-[^/]*\.pkg)"?>.*|\1|p' | tail -n1)
-          URL="http://mac.r-project.org/$R_FILE"
-        else
-          R_FILE=$(curl -sL https://cran.r-project.org/bin/macosx/el-capitan/base/ | grep -o 'R-${{ matrix.r }}[0-9\.]*.pkg' | tail -n1)
-          URL="https://cran.r-project.org/bin/macosx/el-capitan/base/$R_FILE"
-        fi
-        echo downloading "$URL"
-        curl -L "$URL" -o R.pkg
-        sudo installer -pkg R.pkg -target /
-    - name: Install reticulate
-      run: R -e "install.packages('reticulate', repo = 'https://cloud.r-project.org')"
-    - name: Install and running tests
-      run: |
-        export PATH="$HOME/miniconda/bin:$PATH"
-        if [ "${{ matrix.python }}" == "3.4" ]; then
-          conda create -n myenv python=${{ matrix.python }} -c conda-forge
-        else
-          conda create -n myenv python=${{ matrix.python }}
-        fi
-        source $HOME/miniconda/bin/activate myenv
-        python -m pip install -e .[test]
-        python -m pip install jedi
-        pytest -s
-      shell:
-        bash
-
   windows:
     strategy:
       matrix:
@@ -121,6 +42,8 @@ jobs:
         activate myenv
         python -m pip install -e .[test]
         python -m pip install jedi
+        python -m pip install prompt_toolkit
+        python -c "from prompt_toolkit.output.windows10 import is_win_vt100_enabled; print(is_win_vt100_enabled())"
         pytest -s
       shell:
         pwsh
