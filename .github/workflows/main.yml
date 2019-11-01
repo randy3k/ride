@@ -46,6 +46,6 @@ jobs:
         activate myenv
         python -m pip install -e .[test]
         python -m pip install jedi
-        pytest -s
+        pytest
       shell:
         pwsh
