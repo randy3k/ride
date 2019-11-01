@@ -89,8 +89,7 @@ jobs:
         # r: [3.5, latest, devel]
         python: [3.7]
         # python: [2.7, 3.4, 3.5, 3.6, 3.7]
-    # windows-latest doesn't work
-    runs-on: windows-2016
+    runs-on: windows-latest
     steps:
     - uses: actions/checkout@v1
     - name: Download R
