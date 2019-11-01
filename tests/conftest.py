@@ -14,9 +14,9 @@ def pytest_addoption(parser):
 @pytest.fixture(scope='session')
 def radian_command(pytestconfig):
     if pytestconfig.getoption("coverage"):
-        radian_command = [sys.executable, "-m", "radian", "--coverage"]
+        radian_command = [sys.executable]
     else:
-        radian_command = [sys.executable, "-m", "radian"]
+        radian_command = [sys.executable]
 
     return radian_command
 
@@ -25,10 +25,3 @@ def radian_command(pytestconfig):
 def terminal(radian_command):
     with Terminal.open(radian_command) as t:
         yield t
-        t.sendintr()
-        t.write("q()\n")
-        start_time = time.time()
-        while t.isalive():
-            if time.time() - start_time > 5:
-                raise Exception("radian didn't quit cleanly")
-            time.sleep(0.01)
