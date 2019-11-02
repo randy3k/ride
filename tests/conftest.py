@@ -14,7 +14,7 @@ def pytest_addoption(parser):
 @pytest.fixture(scope='session')
 def radian_command(pytestconfig):
     if pytestconfig.getoption("coverage"):
-        radian_command = [sys.executable, "-m", "radian", "--coverage"]
+        radian_command = [sys.executable, "-m", "radian"]
     else:
         radian_command = [sys.executable, "-m", "radian"]
 
