@@ -114,8 +114,8 @@ class Terminal(object):
     @classmethod
     @contextmanager
     def open(cls, cmd):
-        process = PtyProcess.spawn(cmd)
-        screen = Screen(process, 80, 24)
+        process = PtyProcess.spawn(cmd, dimensions=(40, 80))
+        screen = Screen(process, 80, 40)
         stream = ByteStream(screen)
         stream.start_feeding()
         try:
