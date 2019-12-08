@@ -87,7 +87,7 @@ jobs:
       matrix:
         r: [latest]
         # r: [3.5, latest, devel]
-        python: [3.7]
+        python: [3.6]
         # python: [2.7, 3.4, 3.5, 3.6, 3.7]
     runs-on: windows-latest
     steps:
@@ -122,7 +122,8 @@ jobs:
         } Else {
           conda create -y -n myenv python=${{ matrix.python }}
         }
-        activate myenv
+        conda init powershell
+        conda activate myenv
         python -m pip install -e .[test]
         python -m pip install jedi
         pytest -s
