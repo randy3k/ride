@@ -1,13 +1,6 @@
 version: 2.1
 
 commands:
-  install-deps:
-    steps:
-      - run:
-          name: Install apt-get dependencies
-          command: |
-            apt-get update
-            apt-get install git ssh curl bzip2 libffi6 libffi-dev -y
   install-conda:
     parameters:
       python:
@@ -28,6 +21,21 @@ commands:
             else
               $HOME/miniconda/bin/conda create -y --name myenv python=<<parameters.python>>
             fi
+  install-conda-windows:
+    parameters:
+      python:
+        type: string
+        default: "3.6"
+    steps:
+      - run:
+          name: Install Miniconda
+          command: |
+            If ("<<parameters.python>>" -eq "3.4") {
+              conda create -y --name myenv python=<<parameters.python>> -c conda-forge
+            } Else {
+              conda create -y --name myenv python=<<parameters.python>>
+            }
+            conda init powershell
   install-r:
     parameters:
       r:
@@ -47,26 +55,26 @@ commands:
             echo downloading "$URL"
             curl -L "$URL" -o R.pkg
             sudo installer -pkg R.pkg -target /
-  install-r-packages:
+  install-r-windows:
     parameters:
-      packages:
+      r:
         type: string
+        default: "latest"
     steps:
       - run:
-          name: Install R packages
-          command: R --slave -e "install.packages('<<parameters.packages>>', repo = 'https://cloud.r-project.org')"
-  test:
-    steps:
-      - run:
-          name: Install and test
+          name: Install R
           command: |
-            source $HOME/miniconda/bin/activate myenv
-            python -m pip install -e .[test]
-            python -m pip install jedi
-            pytest --coverage
-            coverage combine
-            python -m pip install codecov
-            codecov
+            If ('<<parameters.r>>' -eq 'latest') {
+              (new-object net.webclient).DownloadString("http://cran.rstudio.com/bin/windows/base/") -match 'href="(R-[0-9.]*[a-zA-Z]*-win.exe)"';
+              (new-object net.webclient).DownloadFile($("http://cran.rstudio.com/bin/windows/base/"+$matches[1]),"C:\R-binary.exe")
+            } ElseIf ('<<parameters.r>>' -eq 'devel') {
+              (new-object net.webclient).DownloadFile("https://cran.r-project.org/bin/windows/base/R-devel-win.exe","C:\R-binary.exe")
+            } Else {
+              (new-object net.webclient).DownloadString("http://cran.rstudio.com/bin/windows/base/old/") -match 'R (<<parameters.r>>[\\.0-9]*)</a>'
+              (new-object net.webclient).DownloadFile($("https://cran.r-project.org/bin/windows/base/old/"+$matches[1]+"/R-"+$matches[1]+"-win.exe"),"C:\R-binary.exe")
+            }
+            Start-Process -FilePath "C:\R-binary.exe" -Wait -ArgumentList "/VERYSILENT /DIR=C:\R"
+            [System.Environment]::SetEnvironmentVariable("PATH", "C:\R\bin\x64;$env:PATH", "User")
 
 executors:
   rocker:
@@ -76,6 +84,9 @@ executors:
         default: latest
     docker:
       - image: rocker/tidyverse:<< parameters.tag >>
+
+orbs:
+  win: circleci/windows@2.2.0
 
 jobs:
   linux-test:
@@ -88,14 +99,26 @@ jobs:
       name: rocker
       tag: <<parameters.r>>
     steps:
-      - install-deps
+      - run:
+          name: Install apt-get dependencies
+          command: |
+            apt-get update
+            apt-get install git ssh curl bzip2 libffi6 libffi-dev -y
       - checkout
       - install-conda:
           python: <<parameters.python>>
-      - install-r-packages:
-          packages: "reticulate"
-      - test
-  osx-test:
+      - run: Rscript --slave -e "install.packages('reticulate', repo = 'https://cloud.r-project.org')"
+      - run:
+          name: Install and test
+          command: |
+            source $HOME/miniconda/bin/activate myenv
+            python -m pip install -e .[test]
+            python -m pip install jedi
+            pytest --coverage
+            coverage combine
+            python -m pip install codecov
+            codecov
+  macos-test:
     parameters:
       r:
         type: string
@@ -109,9 +132,41 @@ jobs:
           r: <<parameters.r>>
       - install-conda:
           python: <<parameters.python>>
-      - install-r-packages:
-          packages: "reticulate"
-      - test
+      - run: Rscript --slave -e "install.packages('reticulate', repo = 'https://cloud.r-project.org')"
+      - run:
+          name: Install and test
+          command: |
+            source $HOME/miniconda/bin/activate myenv
+            python -m pip install -e .[test]
+            python -m pip install jedi
+            pytest --coverage
+            coverage combine
+            python -m pip install codecov
+            codecov
+  windows-test:
+    parameters:
+      r:
+        type: string
+      python:
+        type: string
+    executor: win/default
+    steps:
+      - checkout
+      - install-r-windows:
+          r: <<parameters.r>>
+      - install-conda-windows:
+          python: <<parameters.python>>
+      - run: Rscript --slave -e "install.packages('reticulate', repo = 'https://cloud.r-project.org', type = 'win.binary')"
+      - run:
+          name: Install and test
+          command: |
+            conda activate myenv
+            python -m pip install -e .[test]
+            python -m pip install jedi
+            pytest --coverage
+            coverage combine
+            python -m pip install codecov
+            codecov
   upload-tarball:
     docker:
       - image: circleci/python
@@ -189,29 +244,57 @@ workflows:
           filters:
             tags:
               only: /^v.*/
-      - osx-test:
-          name: osx-rlatest-py27
+      - macos-test:
+          name: macos-rlatest-py27
           r: "latest"
           python: "2.7"
           filters:
             tags:
               only: /^v.*/
-      - osx-test:
-          name: osx-rlatest-py37
+      - macos-test:
+          name: macos-rlatest-py37
           r: "latest"
           python: "3.7"
           filters:
             tags:
               only: /^v.*/
-      - osx-test:
-          name: osx-rdevel-py27
+      - macos-test:
+          name: macos-rdevel-py27
           r: "devel"
           python: "2.7"
           filters:
             tags:
               only: /^v.*/
-      - osx-test:
-          name: osx-rdevel-py37
+      - macos-test:
+          name: macos-rdevel-py37
+          r: "devel"
+          python: "3.7"
+          filters:
+            tags:
+              only: /^v.*/
+      - windows-test:
+          name: windows-rlatest-py27
+          r: "latest"
+          python: "2.7"
+          filters:
+            tags:
+              only: /^v.*/
+      - windows-test:
+          name: windows-rlatest-py37
+          r: "latest"
+          python: "3.7"
+          filters:
+            tags:
+              only: /^v.*/
+      - windows-test:
+          name: windows-rdevel-py27
+          r: "devel"
+          python: "2.7"
+          filters:
+            tags:
+              only: /^v.*/
+      - windows-test:
+          name: windows-rdevel-py37
           r: "devel"
           python: "3.7"
           filters:
@@ -228,10 +311,10 @@ workflows:
             - linux-rdevel-py37
             - linux-r35-py27
             - linux-r35-py37
-            - osx-rlatest-py27
-            - osx-rlatest-py37
-            - osx-rdevel-py27
-            - osx-rdevel-py37
+            - macos-rlatest-py27
+            - macos-rlatest-py37
+            - macos-rdevel-py27
+            - macos-rdevel-py37
           filters:
             branches:
               ignore: /.*/
