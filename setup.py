@@ -26,7 +26,7 @@ tests_deps = [
     "pytest",
     "pyte>=0.8.0",
     "pexpect",
-    "pywinpty" if sys.platform.startswith("win") else "ptyprocess"
+    "pywinpty==0.5.7" if sys.platform.startswith("win") else "ptyprocess"
 ]
 
 
